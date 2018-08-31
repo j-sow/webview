@@ -17,7 +17,7 @@ package webview
 #cgo windows CFLAGS: -DWEBVIEW_WINAPI=1
 #cgo windows LDFLAGS: -lole32 -lcomctl32 -loleaut32 -luuid -lgdi32
 
-#cgo darwin CFLAGS: -DWEBVIEW_COCOA=1 
+#cgo darwin CFLAGS: -DWEBVIEW_COCOA=1
 #cgo darwin LDFLAGS: -framework WebKit
 
 #include <stdlib.h>
@@ -82,6 +82,10 @@ static inline void CgoDialog(void *w, int dlgtype, int flags,
 
 static inline int CgoWebViewEval(void *w, char *js) {
 	return webview_eval((struct webview *)w, js);
+}
+
+static inline int CgoWebViewRedirect(void *w, char *url) {
+	return webview_redirect((struct webview *)w, url);
 }
 
 static inline void CgoWebViewInjectCSS(void *w, char *css) {
@@ -203,6 +207,9 @@ type WebView interface {
 	// Eval() evaluates an arbitrary JS code inside the webview. This method must
 	// be called from the main thread only. See Dispatch() for more details.
 	Eval(js string) error
+	// Redirect() redirects window to new url. This method must
+	// be called from the main thread only. See Dispatch() for more details.
+	Redirect(url string) error
 	// InjectJS() injects an arbitrary block of CSS code using the JS API. This
 	// method must be called from the main thread only. See Dispatch() for more
 	// details.
@@ -359,6 +366,16 @@ func (w *webview) Eval(js string) error {
 	p := C.CString(js)
 	defer C.free(unsafe.Pointer(p))
 	switch C.CgoWebViewEval(w.w, p) {
+	case -1:
+		return errors.New("evaluation failed")
+	}
+	return nil
+}
+
+func (w *webview) Redirect(url string) error {
+	p := C.CString(url)
+	defer C.free(unsafe.Pointer(p))
+	switch C.CgoWebViewRedirect(w.w, p) {
 	case -1:
 		return errors.New("evaluation failed")
 	}

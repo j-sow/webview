@@ -156,6 +156,7 @@ WEBVIEW_API int webview(const char *title, const char *url, int width,
 WEBVIEW_API int webview_init(struct webview *w);
 WEBVIEW_API int webview_loop(struct webview *w, int blocking);
 WEBVIEW_API int webview_eval(struct webview *w, const char *js);
+WEBVIEW_API int webview_redirect(struct webview *w, const char *url);
 WEBVIEW_API int webview_inject_css(struct webview *w, const char *css);
 WEBVIEW_API void webview_set_title(struct webview *w, const char *title);
 WEBVIEW_API void webview_set_fullscreen(struct webview *w, int fullscreen);
@@ -440,6 +441,25 @@ WEBVIEW_API int webview_eval(struct webview *w, const char *js) {
   w->priv.js_busy = 1;
   webkit_web_view_run_javascript(WEBKIT_WEB_VIEW(w->priv.webview), js, NULL,
                                  webview_eval_finished, w);
+  while (w->priv.js_busy) {
+    g_main_context_iteration(NULL, TRUE);
+  }
+  return 0;
+}
+
+WEBVIEW_API int webview_redirect(struct webview *w, const char *url) {
+  w->priv.ready = 0;
+  webkit_web_view_load_uri(WEBKIT_WEB_VIEW(w->priv.webview),
+                           webview_check_url(url));
+  while (w->priv.ready == 0) {
+    g_main_context_iteration(NULL, TRUE);
+  }
+  w->priv.js_busy = 1;
+  webkit_web_view_run_javascript(
+      WEBKIT_WEB_VIEW(w->priv.webview),
+      "window.external={invoke:function(x){"
+      "window.webkit.messageHandlers.external.postMessage(x);}}",
+      NULL, webview_eval_finished, w);
   while (w->priv.js_busy) {
     g_main_context_iteration(NULL, TRUE);
   }
